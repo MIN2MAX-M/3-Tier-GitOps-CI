@@ -17,23 +17,23 @@ jobs:
   compile:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code 
-      uses: actions/checkout@v4 
+      - name: Checkout code 
+        uses: actions/checkout@v4 
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4 
-      with: 
-         node-version: '23'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4 
+        with: 
+          node-version: '23'
          
-    - name: Frontend compilation
-      run: |
-         cd client 
-         find . -name "*js" -exec node --check {} +
+      - name: Frontend compilation
+        run: |
+          cd client 
+          find . -name "*js" -exec node --check {} +
 
-    - name: Backend compilation
-      run: |
-         cd api 
-         find . -name "*js" -exec node --check {} +
+      - name: Backend compilation
+        run: |
+          cd api 
+          find . -name "*js" -exec node --check {} +
 
   gitleaks-scan:
     runs-on: ubuntu-latest
@@ -45,8 +45,8 @@ jobs:
         uses: zricethezav/gitleaks-action@v2
       - name: Gitleaks Scan
         run: |
-           gitleaks detect --source ./client --exit-code 1
-           gitleaks detect --source ./api --exit-code 1
+          gitleaks detect --source ./client --exit-code 1
+          gitleaks detect --source ./api --exit-code 1
 
   trivy_fs_scan:
     runs-on: ubuntu-latest
@@ -57,12 +57,12 @@ jobs:
       - name: Run Trivy Vulnerability Scan (fs)
         uses: aquasecurity/trivy-action@0.33.1
         with:
-           scan-type: 'fs'
-           scan-ref: '.'
-           format: 'table'
-           ignore-unfixed: true
-           vuln-type: 'os,library'
-           severity: 'CRITICAL,HIGH'
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
   build_backend_docker_image_and_push:
     runs-on: ubuntu-latest
@@ -136,7 +136,7 @@ jobs:
           scan-type: image
           image-ref: emmytech05/backend:${{ env.IMAGE_TAG }}
           format: table
-          exit-code: '0'  # Corrected typo here
+          exit-code: '0'
           ignore-unfixed: true
           vuln-type: os,library
           severity: 'CRITICAL,HIGH'
@@ -168,21 +168,34 @@ jobs:
           curl -s https://github.com/mikefarah/yq/releases/download/v4.16.1/yq_linux_amd64 -o yq
           sudo install yq /usr/local/bin/yq
 
-      - name: Bump images in manifests
+      - name: Debug CD repo contents
         working-directory: cd
         run: |
-          echo "Listing top-level files:"
+          echo "IMAGE_TAG is: $IMAGE_TAG"
+          echo "Top-level files in CD repo:"
           ls -l
-          echo "Full recursive listing:"
+          echo "Recursive listing:"
           ls -R
-          echo "Preview backend manifest:"
+          echo "Backend manifest preview:"
           head -n 20 k8s-prod/backend.yaml
-          echo "Preview frontend manifest:"
+          echo "Frontend manifest preview:"
           head -n 20 k8s-prod/frontend.yaml
-          test -f k8s-prod/backend.yaml || (echo "backend.yaml not found!" && exit 1)
-          test -f k8s-prod/frontend.yaml || (echo "frontend.yaml not found!" && exit 1)
+
+      - name: Update images in manifests
+        working-directory: cd
+        run: |
+          export IMAGE_TAG=${IMAGE_TAG}
+
+          echo "Backend container names:"
+          yq eval '.spec.template.spec.containers[].name' k8s-prod/backend.yaml
+          echo "Frontend container names:"
+          yq eval '.spec.template.spec.containers[].name' k8s-prod/frontend.yaml
+
           yq -i '.spec.template.spec.containers[] | select(.name=="backend").image = "emmytech05/backend:" + strenv(IMAGE_TAG)' k8s-prod/backend.yaml
           yq -i '.spec.template.spec.containers[] | select(.name=="frontend").image = "emmytech05/frontend:" + strenv(IMAGE_TAG)' k8s-prod/frontend.yaml
+
+          echo "Diff after yq update:"
+          git --no-pager diff
 
       - name: Commit and push to CD repo
         working-directory: cd
@@ -190,6 +203,10 @@ jobs:
           git config user.name "ci-bot"
           git config user.email "ci-bot@user.noreply.github.com"
           git add .
-          git commit -m "Bump images to ${IMAGE_TAG}" || echo "No changes"
-          git push
+          if git diff-index --quiet HEAD --; then
+            echo "No changes to commit"
+          else
+            git commit -m "Bump images to ${IMAGE_TAG}"
+            git push
+          fi
 
