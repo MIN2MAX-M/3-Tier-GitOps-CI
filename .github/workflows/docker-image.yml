@@ -171,8 +171,8 @@ jobs:
       - name: Bump images in manifests
         working-directory: cd
         run: |
-          yq eval -i '.spec.template.spec.containers[] | select(.name=="backend").image = "emmytech05/backend:" + strenv(IMAGE_TAG)' cd/k8s-prod/backend.yaml
-          yq eval -i '.spec.template.spec.containers[] | select(.name=="frontend").image = "emmytech05/frontend:" + strenv(IMAGE_TAG)' cd/k8s-prod/frontend.yaml
+          yq eval -i '.spec.template.spec.containers[] | select(.name=="backend").image = "emmytech05/backend:" + strenv(IMAGE_TAG)' k8s-prod/backend.yaml
+          yq eval -i '.spec.template.spec.containers[] | select(.name=="frontend").image = "emmytech05/frontend:" + strenv(IMAGE_TAG)' k8s-prod/frontend.yaml
 
       - name: Commit and push to CD repo
         working-directory: cd
