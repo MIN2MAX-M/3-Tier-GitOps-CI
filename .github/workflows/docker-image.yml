@@ -171,6 +171,16 @@ jobs:
       - name: Bump images in manifests
         working-directory: cd
         run: |
+          echo "Listing top-level files:"
+          ls -l
+          echo "Full recursive listing:"
+          ls -R
+          echo "Preview backend manifest:"
+          head -n 20 k8s-prod/backend.yaml
+          echo "Preview frontend manifest:"
+          head -n 20 k8s-prod/frontend.yaml
+          test -f k8s-prod/backend.yaml || (echo "backend.yaml not found!" && exit 1)
+          test -f k8s-prod/frontend.yaml || (echo "frontend.yaml not found!" && exit 1)
           yq -i '.spec.template.spec.containers[] | select(.name=="backend").image = "emmytech05/backend:" + strenv(IMAGE_TAG)' k8s-prod/backend.yaml
           yq -i '.spec.template.spec.containers[] | select(.name=="frontend").image = "emmytech05/frontend:" + strenv(IMAGE_TAG)' k8s-prod/frontend.yaml
 
